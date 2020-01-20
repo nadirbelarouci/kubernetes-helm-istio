@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "backend.fullname" . }}-prod
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "backend.fullname" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "backend.fullname" . }}
+        version: prod
+    spec:
+      containers:
+        - image: {{ .Values.image.repository }}:{{ .Values.image.tags.prod }}
+          imagePullPolicy: Always
+          name: {{ include "backend.fullname" . }}
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: MONGODB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "backend.fullname" . }}-secret
+                  key: mongodb-uri
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "backend.fullname" . }}-canary
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "backend.fullname" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "backend.fullname" . }}
+        version: canary
+    spec:
+      containers:
+        - image: {{ .Values.image.repository }}:{{ .Values.image.tags.canary }}
+          imagePullPolicy: Always
+          name: {{ include "backend.fullname" . }}
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: MONGODB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "backend.fullname" . }}-secret
+                  key: mongodb-uri

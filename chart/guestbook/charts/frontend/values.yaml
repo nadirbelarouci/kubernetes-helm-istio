@@ -1,0 +1,11 @@
+image:
+  repository: nadirbelarouci/frontend
+  tag: "2.1"
+replicaCount: 1
+service:
+  type: ClusterIP
+  port: 80
+ingress:
+  host: frontend.minikube.local
+frontend:
+  name: frontend

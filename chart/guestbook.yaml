@@ -1,0 +1,367 @@
+---
+# Source: guestbook/charts/backend/templates/backend-secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: RELEASE-NAME-backend-secret
+data:
+  mongodb-uri: "bW9uZ29kYjovL2FkbWluOnBhc3N3b3JkQFJFTEVBU0UtTkFNRS1kYXRhYmFzZTovZ3Vlc3Rib29rP2F1dGhTb3VyY2U9YWRtaW4="
+#"bW9uZ29kYjovL2FkbWluOnBhc3N3b3JkQFJFTEVBU0UtTkFNRS1kYXRhYmFzZToyNzAxNy9ndWVzdGJvb2s/YXV0aFNvdXJjZT1hZG1pbg=="
+---
+# Source: guestbook/charts/database/templates/mongodb-secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: RELEASE-NAME-database-secret
+data:
+  mongodb-username: "YWRtaW4="
+  mongodb-password: "cGFzc3dvcmQ="
+---
+# Source: guestbook/charts/frontend/templates/frontend-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: RELEASE-NAME-frontend-config
+data:
+  guestbook-name-prod: MyPopRock Festival 2.0 -- PROD
+  guestbook-name-canary: MyPopRock Festival 2.0 -- CANARY
+  backend-uri: http://backend.minikube.local/
+---
+# Source: guestbook/charts/database/templates/mongodb-persistent-volume.yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: RELEASE-NAME-database-pv
+  labels:
+    type: local
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 100Mi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path:  /mnt/data/RELEASE-NAME
+---
+# Source: guestbook/charts/database/templates/mongodb-persistent-volume-claim.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: RELEASE-NAME-database-pvc
+spec:
+  storageClassName: manual
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mi
+---
+# Source: guestbook/charts/backend/templates/backend-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    name: RELEASE-NAME-backend
+  name: RELEASE-NAME-backend
+spec:
+  ports:
+    - port: 80
+      targetPort: 3000
+      name: http
+  selector:
+    app: RELEASE-NAME-backend
+---
+# Source: guestbook/charts/database/templates/mongodb-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    name: RELEASE-NAME-database
+  name: RELEASE-NAME-database
+spec:
+  ports:
+    - name: mongodb
+      port: 27017
+      targetPort: 27017
+  selector:
+    app: RELEASE-NAME-database
+---
+# Source: guestbook/charts/frontend/templates/frontend-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    name: RELEASE-NAME-frontend
+  name: RELEASE-NAME-frontend
+spec:
+  ports:
+    - name: http
+      port: 80
+      targetPort: 4200
+  selector:
+    app: RELEASE-NAME-frontend
+---
+# Source: guestbook/charts/backend/templates/backend.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: RELEASE-NAME-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: RELEASE-NAME-backend
+  template:
+    metadata:
+      labels:
+        app: RELEASE-NAME-backend
+        version: prod
+    spec:
+      containers:
+        - image: nadirbelarouci/backend:2.0
+          imagePullPolicy: Always
+          name: RELEASE-NAME-backend
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: MONGODB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: RELEASE-NAME-backend-secret
+                  key: mongodb-uri
+---
+# Source: guestbook/charts/database/templates/mongodb.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: RELEASE-NAME-database
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: RELEASE-NAME-database
+  template:
+    metadata:
+      labels:
+        app: RELEASE-NAME-database
+        version: prod
+    spec:
+      containers:
+        - image: mongo
+          env:
+            - name: MONGO_INITDB_DATABASE
+              value: guestbook
+            - name: MONGO_INITDB_ROOT_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: RELEASE-NAME-database-secret
+                  key: mongodb-username
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: RELEASE-NAME-database-secret
+                  key: mongodb-password
+          name: RELEASE-NAME-database
+          ports:
+            - name: mongodb
+              containerPort: 27017
+          volumeMounts:
+            - name: RELEASE-NAME-database-volume
+              mountPath: /data/db
+      volumes:
+        - name: RELEASE-NAME-database-volume
+          persistentVolumeClaim:
+            claimName: RELEASE-NAME-database-pvc
+---
+# Source: guestbook/charts/frontend/templates/frontend.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: RELEASE-NAME-frontend-prod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: RELEASE-NAME-frontend
+  template:
+    metadata:
+      labels:
+        app: RELEASE-NAME-frontend
+        version: prod
+    spec:
+      containers:
+        - image: nadirbelarouci/frontend:2.0
+          imagePullPolicy: Always
+          name: RELEASE-NAME-frontend
+          ports:
+            - name: http
+              containerPort: 4200
+          env:
+            - name: BACKEND_URI
+              valueFrom:
+                configMapKeyRef:
+                  name: RELEASE-NAME-frontend-config
+                  key: backend-uri
+            - name: GUESTBOOK_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: RELEASE-NAME-frontend-config
+                  key: guestbook-name-prod
+---
+# Source: guestbook/charts/frontend/templates/frontend.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: RELEASE-NAME-frontend-canary
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: RELEASE-NAME-frontend
+  template:
+    metadata:
+      labels:
+        app: RELEASE-NAME-frontend
+        version: canary
+    spec:
+      containers:
+        - image: nadirbelarouci/frontend:2.0
+          imagePullPolicy: Always
+          name: RELEASE-NAME-frontend
+          ports:
+            - name: http
+              containerPort: 4200
+          env:
+            - name: BACKEND_URI
+              valueFrom:
+                configMapKeyRef:
+                  name: RELEASE-NAME-frontend-config
+                  key: backend-uri
+            - name: GUESTBOOK_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: RELEASE-NAME-frontend-config
+                  key: guestbook-name-canary
+---
+# Source: guestbook/templates/destination-rules.yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: RELEASE-NAME-frontend
+spec:
+  host: RELEASE-NAME-frontend
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+  subsets:
+    - name: prod
+      labels:
+        version: prod
+    - name: canary
+      labels:
+        version: canary
+---
+# Source: guestbook/templates/destination-rules.yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: RELEASE-NAME-database
+spec:
+  host: RELEASE-NAME-database
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+  subsets:
+    - name: prod
+      labels:
+        version: prod
+---
+# Source: guestbook/templates/destination-rules.yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: RELEASE-NAME-backend
+spec:
+  host: RELEASE-NAME-backend
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+  subsets:
+    - name: prod
+      labels:
+        version: prod
+---
+# Source: guestbook/templates/istio-services.yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: RELEASE-NAME-istio-gateway
+spec:
+  selector:
+    istio: ingressgateway # use istio default controller
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - "*"
+---
+# Source: guestbook/templates/istio-services.yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: RELEASE-NAME-frontend
+spec:
+  hosts:
+    - "*"
+  gateways:
+    - RELEASE-NAME-istio-gateway
+  http:
+      - match:
+            - headers:
+                  x-dev-user:
+                      exact: super-secret
+        route:
+            - destination:
+                  host: RELEASE-NAME-frontend
+                  subset: canary
+        retries:
+            attempts: 3
+            perTryTimeout: 2s
+      - route:
+            - destination:
+                  host: RELEASE-NAME-frontend
+                  subset: prod
+        retries:
+            attempts: 3
+            perTryTimeout: 2s
+---
+# Source: guestbook/templates/istio-services.yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: RELEASE-NAME-backend
+spec:
+  hosts:
+    - RELEASE-NAME-backend
+  http:
+    - route:
+        - destination:
+            host: RELEASE-NAME-backend
+            subset: prod
+---
+# Source: guestbook/templates/istio-services.yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: RELEASE-NAME-database
+spec:
+  hosts:
+    - RELEASE-NAME-database
+  mongodb:
+    - route:
+        - destination:
+            host: RELEASE-NAME-database
+            subset: prod

@@ -1,0 +1,33 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: {{ include "frontend.fullname" .}}
+spec:
+  hosts:
+    - {{include "frontend.fullname" .}}
+  http:
+    - route:
+        - destination:
+            host: {{ include "frontend.fullname" .}}
+            subset: prod
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: {{ include "backend.fullname" .}}
+spec:
+  hosts:
+    - {{ include "backend.fullname" .}}
+  http:
+    - match:
+        - headers:
+            x-dev-user:
+              exact: super-secret
+      route:
+        - destination:
+            host: {{ include "backend.fullname" .}}
+            subset: canary
+    - route:
+        - destination:
+            host: {{ include "backend.fullname" .}}
+            subset: prod

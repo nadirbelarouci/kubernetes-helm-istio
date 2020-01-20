@@ -1,0 +1,11 @@
+backend:
+  secret:
+    mongodb_uri:
+      username: admin
+      password: password
+  name: backend
+
+frontend:
+  name: frontend
+database:
+  name: database
